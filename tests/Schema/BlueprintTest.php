@@ -193,6 +193,23 @@ class BlueprintTest extends TestCase
         );
     }
 
+    public function testDropForeign(): void
+    {
+        $conn = $this->getDefaultConnection();
+
+        $blueprint = new Blueprint('Test3', function (Blueprint $table) {
+            $table->dropForeign('fk_test3');
+        });
+
+        $queries = $blueprint->toSql($conn, new Grammar());
+        $this->assertEquals(
+            [
+                'alter table `Test3` drop constraint `fk_test3`',
+            ],
+            $queries
+        );
+    }
+
     public function test_implicit_primaryKey(): void
     {
         $blueprint = new Blueprint('test', function (Blueprint $table) {

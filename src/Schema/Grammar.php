@@ -59,7 +59,7 @@ class Grammar extends BaseGrammar
      */
     public function compileTables()
     {
-        return 'select `table_name` as name from information_schema.tables where table_schema = \'\' and table_type = \'BASE TABLE\'';
+        return 'select `table_name` as name, `table_type` as type, `parent_table_name` as parent from information_schema.tables where table_schema = \'\' and table_type = \'BASE TABLE\'';
     }
 
     /**
@@ -87,11 +87,29 @@ class Grammar extends BaseGrammar
     /**
      * Compile the query to determine the list of indexes.
      *
+     * @param  string  $table
      * @return string
      */
-    public function compileIndexListing()
+    public function compileIndexes($table)
     {
-        return 'select index_name as `index_name` from information_schema.indexes where table_schema = \'\' and table_name = ?';
+        return sprintf(
+            'select index_name as `index_name` from information_schema.indexes where table_schema = \'\' and table_name = %s',
+            $this->quoteString($table)
+        );
+    }
+
+    /**
+     * Compile the query to determine the list of foreign keys.
+     *
+     * @param  string  $table
+     * @return string
+     */
+    public function compileForeignKeys($table)
+    {
+        return sprintf(
+            'select constraint_name as `key_name` from information_schema.table_constraints where constraint_type = "FOREIGN KEY" and table_schema = \'\' and table_name = %s',
+            $this->quoteString($table)
+        );
     }
 
     /**
@@ -162,13 +180,14 @@ class Grammar extends BaseGrammar
      *
      * @param  Blueprint  $blueprint
      * @param  Fluent<string, mixed> $command
-     * @return string
+     * @return string[]
      */
     public function compileDropColumn(Blueprint $blueprint, Fluent $command)
     {
-        $columns = $this->prefixArray('drop column', $this->wrapArray($command->columns));
-
-        return 'alter table '.$this->wrapTable($blueprint).' '.implode(', ', $columns);
+        return $this->prefixArray(
+            'alter table '.$this->wrapTable($blueprint).' drop column',
+            $this->wrapArray($command->columns)
+        );
     }
 
     /**
@@ -342,6 +361,20 @@ class Grammar extends BaseGrammar
     public function compileDropUnique(Blueprint $blueprint, Fluent $command)
     {
         return $this->compileDropIndex($blueprint, $command);
+    }
+
+    /**
+     * Compile a drop foreign key command.
+     *
+     * @param  Blueprint  $blueprint
+     * @param  \Illuminate\Support\Fluent<string, mixed> $command
+     * @return string
+     */
+    public function compileDropForeign(Blueprint $blueprint, Fluent $command)
+    {
+        $index = $this->wrap($command->index);
+
+        return "alter table {$this->wrapTable($blueprint)} drop constraint {$index}";
     }
 
     /**
